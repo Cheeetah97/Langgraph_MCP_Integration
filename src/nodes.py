@@ -11,44 +11,64 @@ def prompt_node(state) -> Command[Literal["agent"]]:
     return Command(
             goto = "agent", 
             update = {
-                "prompt": state['messages'][-1]
+                "prompt": state['messages'][-1].content
             }
         )
 
-def agent_node(state) -> Command[Literal["__end__"]]:
+async def agent_node(state) -> Command[Literal["__end__"]]:
 
     llm = _get_model(name = 'openai', 
-                         temp = 0)
+                     temp = 0)
 
-    tools = asyncio.run(get_tools_http())
+    tools = await get_tools_http()
 
     schema = {
         "title": "article_info",
         "type": "object",
         "properties": {
             "date": {
-                "type": "object",
                 "type": "string",
-                "description": "A list of 2 to 4 Unordered Bullet points for the Slide"
+                "description": "The date on which the article was published."
             },
-            "bullets": {
+            "title": {
+                "type": "string",
+                "description": "A concise title in 7 to 8 words highlighting the crux of the article"
+            },
+            "summary": {
+                "type": "string",
+                "description": "A short paragraph summarizing the article in 2–3 sentences"
+            },
+            "url": {
+                "type": "string",
+                "description": "The direct URL to the original article"
+            },
+            "keywords": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "A list of 2 to 4 Unordered Bullet points for the Slide"
+                "description": "Important keywords or phrases relevant to the article content"
             }
         },
-        "required": ["bullets"]
+        "required": ["date", "title", "summary", "url", "keywords"]
     }
 
     agent = create_react_agent(
         model = llm,
         tools = tools,
-        prompt = "You can use multiple tools in sequence to answer complex questions. Think step by step."
+        prompt = "Use the tools provided to assist the User research on their topic",
+        response_format = schema
     )
+
+    async for step in agent.astream(
+        {"messages": [{"role": "user", "content": state['prompt']}]},
+        stream_mode = "values",
+    ):
+        # step["messages"][-1].pretty_print()
+        if step.get("structured_response", None) is not None:
+            structured_output = step.get("structured_response", None)
 
     return Command(
             goto = "__end__", 
             update = {
-                "messages": state['messages'][-1]
+                "messages": AIMessage(content = f'Output = {structured_output}')
             }
         )

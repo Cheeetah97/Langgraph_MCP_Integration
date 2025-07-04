@@ -89,7 +89,7 @@ tools = asyncio.run(get_tools_http())
 agent = create_react_agent(
     model = llm,
     tools = tools,
-    prompt = "You can use multiple tools in sequence to answer complex questions. Think step by step."
+    prompt = "Use the tool provided to answer User's questions and assist in research"#"You can use multiple tools in sequence to answer complex questions. Think step by step."
 )
 
 async def main():
